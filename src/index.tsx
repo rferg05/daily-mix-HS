@@ -5,7 +5,7 @@ import { hostFrameStyle } from './host-style';
 import { readConfig } from './config';
 import type { Config, ItemId } from './config';
 import { useFitFontSize } from './fit';
-import { hostFetcher, loadJokes, loadQuotes, localDay, PLUGIN_ID, SourceError, wordForDay } from './content';
+import { hostFetcher, loadJokes, loadQuotes, localDay, periodKey, Pins, PLUGIN_ID, SourceError, wordForDay, wordForKey } from './content';
 import type { Fetcher, Joke, Quote } from './content';
 
 /** Fetch a fresh batch of jokes and quotes this often. */
@@ -45,13 +45,14 @@ interface Source<T> {
   name: string;
   load: (fetcher: Fetcher) => Promise<T[]>;
   items: T[];
+  pins: Pins<T>;
   failure: string | null;
   loadedAt: number;
   loading: Promise<void> | null;
 }
 
 const source = <T,>(name: string, load: (fetcher: Fetcher) => Promise<T[]>): Source<T> =>
-  ({ name, load, items: [], failure: null, loadedAt: 0, loading: null });
+  ({ name, load, items: [], pins: new Pins<T>(), failure: null, loadedAt: 0, loading: null });
 
 const jokes = source<Joke>('icanhazdadjoke', (f) => loadJokes(f));
 const quotes = source<Quote>('ZenQuotes', loadQuotes);
@@ -101,7 +102,7 @@ function useContent(fetcher: Fetcher, cfg: Config, timezone: string | undefined)
     };
   }, [fetcher, wantJokes, wantQuotes]);
 
-  return { jokes, quotes, word: wordForDay(localDay(timezone)) };
+  return { jokes, quotes };
 }
 
 // ── Timer ───────────────────────────────────────────────────────────────────
@@ -341,14 +342,19 @@ export default function DailyMix(props: PluginComponentProps & { fetcher?: Fetch
     id === 'word' || (id === 'joke' ? data.jokes.items.length > 0 : data.quotes.items.length > 0));
   const n = items.length;
 
-  /** Slide `s` shows item `s mod n`; each time the joke or quote comes round
-   *  again it's the next one in the batch. */
+  /** Slide `s` shows item `s mod n`, with the content for its period: the
+   *  same joke, word or quote until the period changes. */
   const contentAt = (s: number): Content => {
     const item = items[((s % n) + n) % n];
-    const round = Math.floor(s / n);
-    if (item === 'joke') return { item, joke: data.jokes.items[round % data.jokes.items.length] };
-    if (item === 'quote') return { item, quote: data.quotes.items[round % data.quotes.items.length] };
-    return { item, word: data.word };
+    const key = periodKey({ slide: s, items: n, rotateSeconds: cfg.rotateSeconds, changeMinutes: cfg.changeMinutes, timezone });
+    const pin = `${cfg.changeMinutes}|${key}`;
+    if (item === 'joke') return { item, joke: data.jokes.pins.get(pin, data.jokes.items) };
+    if (item === 'quote') return { item, quote: data.quotes.pins.get(pin, data.quotes.items) };
+    // A whole day: the built-in module's word for the date the slide shows on.
+    const word = cfg.changeMinutes === 1440
+      ? wordForDay(localDay(timezone, new Date(s * cfg.rotateSeconds * 1000)))
+      : wordForKey(key);
+    return { item, word };
   };
 
   const pending = cfg.items.filter((id) => id !== 'word')

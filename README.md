@@ -5,10 +5,10 @@ Home Screens module: the built-in Dad Joke, Word of the Day and Quote modules ro
 ## What it shows
 
 - **Dad joke**: a question-and-answer joke shows its question, then the answer on its own line in bold color.
-- **Word of the day**: the word, large, its part of speech and its definition. Same list and same pick as the built-in Word of the Day module, so both show the same word on the same day, changing at the household's midnight.
+- **Word of the day**: the word, large, its part of speech and its definition, from the built-in Word of the Day module's list. Kept for a whole day, it's the same word the built-in module shows that day.
 - **Quote of the day**: the quote and its author.
 
-One item fills the module at a time and crossfades to the next on the timer. Each time the joke or quote comes round again it's a new one, from a batch fetched once an hour. If a source can't be reached, it's skipped until it's back.
+One item fills the module at a time and crossfades to the next on the timer. By default each time an item comes round again it's a new one; set **Show the same joke, word and quote for** to keep each for anything from 5 minutes to a whole day. Periods follow the household's clock, so hourly changes land on the hour and daily ones at midnight. Jokes and quotes come from a batch fetched once an hour. If a source can't be reached, it's skipped until it's back.
 
 Text grows to the largest size that fits the module, whatever its shape, so a short joke is huge and a long quote still fits.
 
@@ -29,7 +29,8 @@ No account or key is needed.
 | Setting | Default | |
 |---|---|---|
 | Dad joke / Word of the day / Quote of the day | on | Which items take a turn. |
-| Show each for | 20 s | 5 to 300 seconds. |
+| Show each for | 20 s | 5 to 300 seconds per turn. |
+| Show the same joke, word and quote for | One turn | Or 5, 15 or 30 minutes, 1, 3, 6 or 12 hours, or a whole day. |
 | Show a heading on each | on | Turn off for slightly larger text. |
 
 ## Where it comes from

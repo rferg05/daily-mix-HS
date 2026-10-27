@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { loadJokes, loadQuotes, readJokes, readQuotes, splitJoke, wordForDay } from '../src/content';
+import { loadJokes, loadQuotes, periodKey, Pins, readJokes, readQuotes, splitJoke, wordForDay, wordForKey } from '../src/content';
 import type { Fetcher } from '../src/content';
 import { readConfig } from '../src/config';
 
@@ -72,13 +72,51 @@ describe('word of the day', () => {
   });
 });
 
-describe('config', () => {
-  it('defaults everything on, every 20 seconds', () => {
-    expect(readConfig({})).toEqual({ items: ['joke', 'word', 'quote'], rotateSeconds: 20, headings: true });
+describe('how long content stays', () => {
+  const at = (iso: string) => Date.parse(iso) / 1000;
+
+  it('gives each turn its own key when there is no period', () => {
+    const keys = [0, 1, 2, 3, 4, 5].map((slide) => periodKey({ slide, items: 3, rotateSeconds: 20, changeMinutes: 0 }));
+    expect(keys).toEqual([0, 0, 0, 1, 1, 1]);
   });
 
-  it('reads toggles and clamps the timer', () => {
-    expect(readConfig({ word: false, rotateSeconds: '2', headings: 'false' }))
-      .toEqual({ items: ['joke', 'quote'], rotateSeconds: 5, headings: false });
+  it('keeps the key for the whole period, on the household clock', () => {
+    const key = (iso: string, changeMinutes: number) =>
+      periodKey({ slide: at(iso) / 20, items: 3, rotateSeconds: 20, changeMinutes, timezone: 'America/Chicago' });
+    // 11:00 and 11:59 PM Chicago share an hour; midnight Chicago starts a new day.
+    expect(key('2026-10-27T04:00:00Z', 60)).toBe(key('2026-10-27T04:59:40Z', 60));
+    expect(key('2026-10-27T04:59:40Z', 60)).not.toBe(key('2026-10-27T05:00:00Z', 60));
+    expect(key('2026-10-27T04:59:40Z', 1440)).not.toBe(key('2026-10-27T05:00:00Z', 1440));
+    expect(key('2026-10-27T05:00:00Z', 1440)).toBe(key('2026-10-28T04:59:40Z', 1440));
+    // Three hours run 12–3, 3–6…, local.
+    expect(key('2026-10-27T05:00:00Z', 180)).toBe(key('2026-10-27T07:59:40Z', 180));
+    expect(key('2026-10-27T07:59:40Z', 180)).not.toBe(key('2026-10-27T08:00:00Z', 180));
+  });
+
+  it('pins a batch item to its key, even after a new batch arrives', () => {
+    const pins = new Pins<string>();
+    expect(pins.get('a', ['one', 'two'])).toBe('one');
+    expect(pins.get('b', ['one', 'two'])).toBe('two');
+    expect(pins.get('a', ['three', 'four'])).toBe('one');
+    expect(pins.get('c', ['three', 'four'])).toBe('three');
+  });
+
+  it('deals every word once before repeating', () => {
+    const seen = new Set<string>();
+    for (let k = 0; k < 732; k++) seen.add(wordForKey(k).word);
+    expect(seen.size).toBe(732);
+  });
+});
+
+describe('config', () => {
+  it('defaults everything on, every 20 seconds, new each turn', () => {
+    expect(readConfig({})).toEqual({ items: ['joke', 'word', 'quote'], rotateSeconds: 20, changeMinutes: 0, headings: true });
+  });
+
+  it('reads toggles, clamps the timer and accepts only listed periods', () => {
+    expect(readConfig({ word: false, rotateSeconds: '2', headings: 'false', changeEvery: '60' }))
+      .toEqual({ items: ['joke', 'quote'], rotateSeconds: 5, changeMinutes: 60, headings: false });
+    expect(readConfig({ changeEvery: 1440 }).changeMinutes).toBe(1440);
+    expect(readConfig({ changeEvery: '7' }).changeMinutes).toBe(0);
   });
 });

@@ -1,7 +1,7 @@
 {
   "id": "daily-mix",
   "name": "Joke, Word & Quote",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "A dad joke, the word of the day and a quote, one at a time on a timer, each as large as the module allows so it reads from across the room.",
   "author": "Ryan",
   "license": "MIT",
@@ -14,6 +14,7 @@
     "word": true,
     "quote": true,
     "rotateSeconds": 20,
+    "changeEvery": "0",
     "headings": true
   },
   "defaultSize": {
@@ -55,6 +56,15 @@
         "maximum": 300,
         "ui:widget": "slider",
         "ui:step": 5,
+        "ui:group": "Display"
+      },
+      "changeEvery": {
+        "type": "string",
+        "title": "Show the same joke, word and quote for",
+        "description": "Until then, each comes back unchanged on its turn. Once a day changes at midnight, and its word matches the built-in Word of the Day module.",
+        "enum": ["0", "5", "15", "30", "60", "180", "360", "720", "1440"],
+        "enumLabels": ["One turn (new each time)", "5 minutes", "15 minutes", "30 minutes", "1 hour", "3 hours", "6 hours", "12 hours", "A whole day"],
+        "ui:widget": "select",
         "ui:group": "Display"
       },
       "headings": {

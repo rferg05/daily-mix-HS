@@ -178,6 +178,67 @@ export function wordForDay(day: Day, words: WordEntry[] = EN_US_WORDS): WordEntr
   return words[order[slot]];
 }
 
+/** A word for any period key, each word once per pass through the list. */
+export function wordForKey(key: number, words: WordEntry[] = EN_US_WORDS): WordEntry {
+  const len = words.length;
+  const order = seededPermutation(len, Math.floor(key / len) ^ 0x5eed);
+  return words[order[((key % len) + len) % len]];
+}
+
+// ── How long content stays ──────────────────────────────────────────────────
+
+const clocks = new Map<string, Intl.DateTimeFormat>();
+
+/** Minutes since 1970 on the household's wall clock, so periods line up with
+ *  its hours and its midnight rather than UTC's. */
+export function localMinutes(timezone: string | undefined, ms: number): number {
+  try {
+    const tz = timezone || '';
+    let clock = clocks.get(tz);
+    if (!clock) {
+      clock = new Intl.DateTimeFormat('en-US', {
+        timeZone: tz || undefined, hourCycle: 'h23',
+        year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric',
+      });
+      clocks.set(tz, clock);
+    }
+    const parts = clock.formatToParts(ms);
+    const get = (t: string) => Number(parts.find((p) => p.type === t)?.value);
+    const minutes = Date.UTC(get('year'), get('month') - 1, get('day'), get('hour'), get('minute')) / 60_000;
+    if (Number.isFinite(minutes)) return minutes;
+  } catch { /* unknown time zone: use the device's */ }
+  return Math.floor((ms - new Date(ms).getTimezoneOffset() * 60_000) / 60_000);
+}
+
+/** Which content a slide shows: slides with the same key show the same joke,
+ *  word or quote. With no period it's the round, so each turn is new;
+ *  otherwise it's the period the slide starts in. */
+export function periodKey(opts: {
+  slide: number; items: number; rotateSeconds: number; changeMinutes: number; timezone?: string;
+}): number {
+  const { slide, items, rotateSeconds, changeMinutes, timezone } = opts;
+  if (changeMinutes <= 0) return Math.floor(slide / items);
+  return Math.floor(localMinutes(timezone, slide * rotateSeconds * 1000) / changeMinutes);
+}
+
+/** Remembers which joke or quote went with each key, so a fresh batch
+ *  arriving mid-period doesn't swap the one on screen. */
+export class Pins<T> {
+  private readonly map = new Map<string, T>();
+  private cursor = 0;
+
+  get(key: string, batch: T[]): T {
+    let v = this.map.get(key);
+    if (v === undefined) {
+      v = batch[this.cursor++ % batch.length];
+      this.map.set(key, v);
+      // Only the shown, leaving and next slides need theirs.
+      if (this.map.size > 8) this.map.delete(this.map.keys().next().value!);
+    }
+    return v;
+  }
+}
+
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
 function shuffle<T>(list: T[], random: () => number): T[] {
