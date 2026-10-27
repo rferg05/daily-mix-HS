@@ -1,0 +1,76 @@
+{
+  "id": "daily-mix",
+  "name": "Joke, Word & Quote",
+  "version": "1.0.0",
+  "description": "A dad joke, the word of the day and a quote, one at a time on a timer, each as large as the module allows so it reads from across the room.",
+  "author": "Ryan",
+  "license": "MIT",
+  "minAppVersion": "1.13.0",
+  "moduleType": "daily-mix",
+  "category": "Information",
+  "icon": "MessageSquareQuote",
+  "defaultConfig": {
+    "joke": true,
+    "word": true,
+    "quote": true,
+    "rotateSeconds": 20,
+    "headings": true
+  },
+  "defaultSize": {
+    "w": 960,
+    "h": 540
+  },
+  "defaultStyle": {
+    "fontSize": 18,
+    "padding": 0,
+    "borderRadius": 12,
+    "backgroundColor": "rgba(0, 0, 0, 0.35)"
+  },
+  "configSchema": {
+    "type": "object",
+    "properties": {
+      "joke": {
+        "type": "boolean",
+        "title": "Dad joke",
+        "ui:widget": "toggle",
+        "ui:group": "Show"
+      },
+      "word": {
+        "type": "boolean",
+        "title": "Word of the day",
+        "ui:widget": "toggle",
+        "ui:group": "Show"
+      },
+      "quote": {
+        "type": "boolean",
+        "title": "Quote of the day",
+        "ui:widget": "toggle",
+        "ui:group": "Show"
+      },
+      "rotateSeconds": {
+        "type": "number",
+        "title": "Show each for (seconds)",
+        "description": "Each time the joke or quote comes round again, it's a new one.",
+        "minimum": 5,
+        "maximum": 300,
+        "ui:widget": "slider",
+        "ui:step": 5,
+        "ui:group": "Display"
+      },
+      "headings": {
+        "type": "boolean",
+        "title": "Show a heading on each",
+        "description": "Turn off for slightly larger text.",
+        "ui:widget": "toggle",
+        "ui:group": "Display"
+      }
+    }
+  },
+  "allowedDomains": ["icanhazdadjoke.com", "zenquotes.io"],
+  "exports": {
+    "component": "default"
+  },
+  "dataRequirements": [],
+  "prefetchUrl": null,
+  "permissions": ["network"]
+}
