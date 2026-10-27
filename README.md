@@ -10,7 +10,7 @@ Home Screens module: the built-in Dad Joke, Word of the Day and Quote modules ro
 
 One item fills the module at a time and crossfades to the next on the timer. By default each time an item comes round again it's a new one; set **Show the same joke, word and quote for** to keep each for anything from 5 minutes to a whole day. Periods follow the household's clock, so hourly changes land on the hour and daily ones at midnight. Jokes and quotes come from a batch fetched once an hour. If a source can't be reached, it's skipped until it's back.
 
-Text grows to the largest size that fits the module, whatever its shape, so a short joke is huge and a long quote still fits.
+Text grows to the largest size that fits the module, whatever its shape, so a short joke is huge and a long quote still fits. Each item also reshapes to the module: in a short, wide strip the word sits beside its definition, a joke's answer follows straight on from its question, the author follows the quote, and the heading moves to the side, whichever of these gives the largest text.
 
 ## Install
 

@@ -1,7 +1,7 @@
 {
   "id": "daily-mix",
   "name": "Joke, Word & Quote",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "A dad joke, the word of the day and a quote, one at a time on a timer, each as large as the module allows so it reads from across the room.",
   "author": "Ryan",
   "license": "MIT",

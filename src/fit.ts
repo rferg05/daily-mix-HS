@@ -5,9 +5,11 @@ const MIN_FONT_PX = 6;
 /** Leave a sliver of slack so sub-pixel rounding can't reintroduce an overflow. */
 const SAFETY = 0.995;
 /** Stop once the largest known-fitting and smallest known-too-big scales are this close. */
-const TOLERANCE = 0.02;
-/** Hard cap on measure/correct rounds per content change. */
-const MAX_STEPS = 8;
+const TOLERANCE = 0.01;
+/** Hard cap on measure/correct rounds per content change. Generous, because
+ *  the slide compares its layouts by these sizes and the starting size is
+ *  high. */
+const MAX_STEPS = 14;
 
 /** How far the box, or any `[data-fit]` region inside it, overflows: 1 when
  *  nothing does, else the worst client/scroll ratio. The regions matter in the

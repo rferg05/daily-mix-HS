@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import type { PluginComponentProps } from './hs-plugin';
 import { hostFrameStyle } from './host-style';
@@ -159,7 +159,36 @@ type Content =
 /** Padding inside the module: a share of its short side, in pixels. */
 const panelPad = (w: number, h: number) => Math.round(Math.max(10, Math.min(40, Math.min(w, h) * 0.06)));
 
-function Heading({ item, fontSize }: { item: ItemId; fontSize: number }) {
+/** Where the heading sits: above the text, or in a column beside it, which
+ *  gives a short, wide module its height back. */
+type HeadingAt = 'top' | 'side';
+/** How the text is arranged: `stack` puts each part on a line of its own;
+ *  `flow` runs the parts on together (the word beside its definition, the
+ *  answer straight after the question), which fills a wide module's width. */
+type Arrange = 'stack' | 'flow';
+
+interface Variant {
+  id: string;
+  heading: HeadingAt;
+  arrange: Arrange;
+}
+
+/** In order of preference: a later one is only used when its text comes
+ *  out clearly larger. */
+function variantsFor(headings: boolean): Variant[] {
+  const at: HeadingAt[] = headings ? ['top', 'side'] : ['top'];
+  return at.flatMap((heading) => (['stack', 'flow'] as const).map((arrange) => ({ id: `${heading}-${arrange}`, heading, arrange })));
+}
+
+/** How much larger a less preferred layout's text must be to win. */
+const PREFER_MARGIN = 1.08;
+
+function choose(variants: Variant[], sizes: Record<string, number>): Variant {
+  const best = Math.max(0, ...variants.map((v) => sizes[v.id] ?? 0));
+  return variants.find((v) => (sizes[v.id] ?? 0) * PREFER_MARGIN >= best) ?? variants[0];
+}
+
+function Heading({ item, fontSize, at }: { item: ItemId; fontSize: number; at: HeadingAt }) {
   return (
     <div
       style={{
@@ -169,10 +198,11 @@ function Heading({ item, fontSize }: { item: ItemId; fontSize: number }) {
         letterSpacing: '0.06em',
         textTransform: 'uppercase',
         color: ACCENT[item],
-        whiteSpace: 'nowrap',
-        overflow: 'hidden',
-        textOverflow: 'ellipsis',
         lineHeight: 1.2,
+        ...(at === 'top'
+          ? { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }
+          // Beside the text it wraps into a narrow column: "Word of / the day".
+          : { width: '5.6em', overflowWrap: 'break-word' }),
       }}
     >
       {LABEL[item]}
@@ -180,7 +210,15 @@ function Heading({ item, fontSize }: { item: ItemId; fontSize: number }) {
   );
 }
 
-function JokeBody({ joke }: { joke: Joke }) {
+function JokeBody({ joke, arrange }: { joke: Joke; arrange: Arrange }) {
+  if (arrange === 'flow' && joke.punchline) {
+    return (
+      <div style={{ textAlign: 'center', lineHeight: 1.25, whiteSpace: 'pre-line', fontWeight: 600 }}>
+        {joke.setup}{' '}
+        <span style={{ fontWeight: 800, color: ACCENT.joke }}>{joke.punchline}</span>
+      </div>
+    );
+  }
   return (
     <div style={{ textAlign: 'center', lineHeight: 1.25, whiteSpace: 'pre-line' }}>
       <div style={{ fontWeight: 600 }}>{joke.setup}</div>
@@ -191,27 +229,46 @@ function JokeBody({ joke }: { joke: Joke }) {
   );
 }
 
-function WordBody({ word }: { word: ReturnType<typeof wordForDay> }) {
+function WordBody({ word, arrange }: { word: ReturnType<typeof wordForDay>; arrange: Arrange }) {
+  const name = <div style={{ fontSize: '2.2em', fontWeight: 800, lineHeight: 1.05, color: ACCENT.word, whiteSpace: 'nowrap' }}>{word.word}</div>;
+  if (arrange === 'flow') {
+    // The part of speech leads the definition, so the column beside the word
+    // is no taller than the definition itself.
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.7em' }}>
+        <div style={{ flex: 'none' }}>{name}</div>
+        <div style={{ flex: '0 1 auto', minWidth: 0, borderLeft: `0.08em solid ${ACCENT.word}`, paddingLeft: '0.7em', fontWeight: 600, lineHeight: 1.25 }}>
+          <span style={{ fontStyle: 'italic', opacity: 0.75 }}>{word.pos}</span>
+          {' · '}
+          {word.definition}
+        </div>
+      </div>
+    );
+  }
   return (
     <div style={{ textAlign: 'center' }}>
-      <div style={{ fontSize: '2.2em', fontWeight: 800, lineHeight: 1.05, color: ACCENT.word }}>{word.word}</div>
+      {name}
       <div style={{ fontSize: '0.7em', fontStyle: 'italic', fontWeight: 600, opacity: 0.75, margin: '0.25em 0 0.35em' }}>{word.pos}</div>
       <div style={{ fontWeight: 600, lineHeight: 1.25 }}>{word.definition}</div>
     </div>
   );
 }
 
-function QuoteBody({ quote }: { quote: Quote }) {
+function QuoteBody({ quote, arrange }: { quote: Quote; arrange: Arrange }) {
+  const author = quote.author && (
+    // Kept on one line when it follows the quote; on a line of its own it may
+    // wrap, so a long name doesn't hold a narrow module's text down.
+    <span style={{ fontSize: '0.7em', fontWeight: 700, color: ACCENT.quote, whiteSpace: arrange === 'flow' ? 'nowrap' : undefined }}>{'—'} {quote.author}</span>
+  );
   return (
     <div style={{ borderLeft: `0.12em solid ${ACCENT.quote}`, paddingLeft: '0.6em' }}>
       <div style={{ fontWeight: 600, lineHeight: 1.25 }}>
         <span style={{ color: ACCENT.quote, fontWeight: 800 }}>{'“'}</span>
         {quote.text}
         <span style={{ color: ACCENT.quote, fontWeight: 800 }}>{'”'}</span>
+        {arrange === 'flow' && author && <>{'  '}{author}</>}
       </div>
-      {quote.author && (
-        <div style={{ fontSize: '0.7em', fontWeight: 700, color: ACCENT.quote, marginTop: '0.45em' }}>{'—'} {quote.author}</div>
-      )}
+      {arrange === 'stack' && author && <div style={{ marginTop: '0.45em' }}>{author}</div>}
     </div>
   );
 }
@@ -219,46 +276,88 @@ function QuoteBody({ quote }: { quote: Quote }) {
 const contentKey = (c: Content) =>
   c.item === 'joke' ? `j|${c.joke.setup}` : c.item === 'word' ? `w|${c.word.word}` : `q|${c.quote.text}`;
 
-/** One item, its text as large as the module allows. The upper bound is
- *  generous on purpose: the fit shrinks it to the largest size that fits, so
- *  a short joke reads from across the room and a long quote still fits. */
-function Slide({ content, headings, baseFont }: { content: Content; headings: boolean; baseFont: number }) {
-  const [ref, box] = useBoxSize();
-  const { w, h } = box;
+interface LayoutProps {
+  content: Content;
+  variant: Variant;
+  headings: boolean;
+  shown: boolean;
+  w: number;
+  h: number;
+  baseFont: number;
+  onFit: (id: string, fontSize: number) => void;
+}
+
+/** One way of laying out an item, its text as large as it fits. The upper
+ *  bound is generous on purpose: the fit shrinks it to the largest size that
+ *  fits, so a short joke reads from across the room and a long quote still
+ *  fits. */
+function Layout({ content, variant, headings, shown, w, h, baseFont, onFit }: LayoutProps) {
   const pad = panelPad(w, h);
   const headingFont = Math.max(baseFont, Math.min(baseFont * 2.4, Math.min(w, h) * 0.065));
-  const desired = Math.max(baseFont, Math.min(w, h) / 2.5);
-  const { boxRef, fontSize } = useFitFontSize(desired, `${contentKey(content)}|${headings ? 1 : 0}|${w}x${h}`);
+  const desired = Math.max(baseFont, Math.min(w, h) / 2);
+  const { boxRef, fontSize } = useFitFontSize(desired, `${contentKey(content)}|${variant.id}|${w}x${h}`);
+  // Reported before paint, so the best layout is chosen before any is seen.
+  useLayoutEffect(() => { onFit(variant.id, fontSize); }, [variant.id, fontSize, onFit]);
 
+  const side = headings && variant.heading === 'side';
   return (
     <div
-      ref={ref}
+      aria-hidden={!shown}
       style={{
         position: 'absolute',
         inset: 0,
         boxSizing: 'border-box',
         padding: pad,
         display: 'flex',
-        flexDirection: 'column',
-        gap: Math.round(pad * 0.4),
+        flexDirection: side ? 'row' : 'column',
+        gap: Math.round(pad * (side ? 0.8 : 0.4)),
         overflow: 'hidden',
+        visibility: shown ? undefined : 'hidden',
       }}
     >
-      {w > 0 && headings && <Heading item={content.item} fontSize={headingFont} />}
-      {w > 0 && (
-        <div
-          ref={boxRef}
-          style={{ flex: '1 1 0', minHeight: 0, minWidth: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', fontSize }}
-        >
-          {/* Auto margins center the text, and unlike justify-content they let
-              an overlong one overflow downward, where the fit can measure it. */}
-          <div style={{ margin: 'auto 0', width: '100%' }}>
-            {content.item === 'joke' && <JokeBody joke={content.joke} />}
-            {content.item === 'word' && <WordBody word={content.word} />}
-            {content.item === 'quote' && <QuoteBody quote={content.quote} />}
-          </div>
+      {headings && <Heading item={content.item} fontSize={headingFont} at={variant.heading} />}
+      <div
+        ref={boxRef}
+        style={{ flex: '1 1 0', minHeight: 0, minWidth: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', fontSize }}
+      >
+        {/* Auto margins center the text, and unlike justify-content they let
+            an overlong one overflow downward, where the fit can measure it. */}
+        <div style={{ margin: 'auto 0', width: '100%' }}>
+          {content.item === 'joke' && <JokeBody joke={content.joke} arrange={variant.arrange} />}
+          {content.item === 'word' && <WordBody word={content.word} arrange={variant.arrange} />}
+          {content.item === 'quote' && <QuoteBody quote={content.quote} arrange={variant.arrange} />}
         </div>
-      )}
+      </div>
+    </div>
+  );
+}
+
+/** One item, in whichever layout gives it the largest text for the module's
+ *  shape. Every layout is fitted, hidden, and the winner shown. */
+function Slide({ content, headings, baseFont }: { content: Content; headings: boolean; baseFont: number }) {
+  const [ref, box] = useBoxSize();
+  const variants = useMemo(() => variantsFor(headings), [headings]);
+  const [sizes, setSizes] = useState<Record<string, number>>({});
+  const onFit = useCallback((id: string, fontSize: number) => {
+    setSizes((s) => (s[id] === fontSize ? s : { ...s, [id]: fontSize }));
+  }, []);
+  const pick = choose(variants, sizes);
+
+  return (
+    <div ref={ref} style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
+      {box.w > 0 && variants.map((v) => (
+        <Layout
+          key={v.id}
+          content={content}
+          variant={v}
+          headings={headings}
+          shown={v.id === pick.id}
+          w={box.w}
+          h={box.h}
+          baseFont={baseFont}
+          onFit={onFit}
+        />
+      ))}
     </div>
   );
 }
